@@ -81,7 +81,57 @@ async function attachVendors(services) {
 
   return services.map((s) => ({ ...s, vendor: map.get(s.vendorId) || null }));
 }
+// bookings er sathe service, vendor ar customer er info jure dey
+async function enrichBookings(bookings) {
+  const db = await getDb();
+  const toIds = (arr) =>
+    [...new Set(arr)]
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
 
+  const services = await db
+    .collection("services")
+    .find({ _id: { $in: toIds(bookings.map((b) => b.serviceId)) } })
+    .toArray();
+  const sMap = new Map(
+    services.map((s) => [
+      s._id.toString(),
+      {
+        _id: s._id.toString(),
+        serviceName: s.serviceName,
+        category: s.category,
+        price: s.price,
+        location: s.location,
+        image: s.images?.[0] || null,
+      },
+    ]),
+  );
+
+  const users = await db
+    .collection("user")
+    .find({
+      _id: { $in: toIds(bookings.flatMap((b) => [b.vendorId, b.customerId])) },
+    })
+    .toArray();
+  const uMap = new Map(
+    users.map((u) => [
+      u._id.toString(),
+      {
+        name: u.name,
+        email: u.email,
+        image: u.image || null,
+        businessName: u.businessName || null,
+      },
+    ]),
+  );
+
+  return bookings.map((b) => ({
+    ...b,
+    service: sMap.get(b.serviceId) || null,
+    vendor: uMap.get(b.vendorId) || null,
+    customer: uMap.get(b.customerId) || null,
+  }));
+}
 module.exports = {
   CATEGORIES,
   FREE_PLAN_LIMIT,
@@ -91,4 +141,5 @@ module.exports = {
   escapeRegex,
   validateService,
   attachVendors,
+  enrichBookings,
 };
