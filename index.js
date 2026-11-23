@@ -12,6 +12,10 @@ app.get("/", (req, res) => {
   res.send("WedPlan server is running");
 });
 
-app.listen(port, () => {
+app.listen(port, (err) => {
+  if (err) {
+    console.error("Failed to start server:", err.message);
+    return;
+  }
   console.log(`Server running on port ${port}`);
 });
