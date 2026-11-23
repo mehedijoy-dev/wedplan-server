@@ -1,3 +1,11 @@
+const {
+  wrap,
+  isPremium,
+  toObjectId,
+  validateService,
+  enrichBookings,
+  FREE_PLAN_LIMIT,
+} = require("../utils/helpers");
 const express = require("express");
 const { getDb } = require("../db");
 const { verifyJWT, requireRole } = require("../middleware/auth");
@@ -182,5 +190,47 @@ router.delete(
     res.json({ message: "Service deleted" });
   }),
 );
+// Booking requests for this vendor's services
+router.get(
+  "/bookings",
+  wrap(async (req, res) => {
+    const col = (await getDb()).collection("bookings");
+    const items = await col
+      .find({ vendorId: req.user.id })
+      .sort({ createdAt: -1 })
+      .toArray();
+    res.json({ bookings: await enrichBookings(items) });
+  }),
+);
 
+// Accept / reject (sudhu pending, ekbar-i)
+router.patch(
+  "/bookings/:id/status",
+  wrap(async (req, res) => {
+    const _id = toObjectId(req.params.id);
+    if (!_id) return res.status(400).json({ message: "Invalid booking ID" });
+
+    const { status } = req.body;
+    if (!["accepted", "rejected"].includes(status))
+      return res
+        .status(400)
+        .json({ message: "Status must be accepted or rejected" });
+
+    const col = (await getDb()).collection("bookings");
+    const result = await col.updateOne(
+      { _id, vendorId: req.user.id, status: "pending" },
+      { $set: { status, updatedAt: new Date() } },
+    );
+
+    if (!result.matchedCount) {
+      const exists = await col.findOne({ _id, vendorId: req.user.id });
+      if (!exists)
+        return res.status(404).json({ message: "Booking not found" });
+      return res
+        .status(400)
+        .json({ message: "This request has already been processed" });
+    }
+    res.json({ message: `Booking ${status}` });
+  }),
+);
 module.exports = router;
