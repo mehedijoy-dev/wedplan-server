@@ -1,11 +1,3 @@
-const {
-  wrap,
-  isPremium,
-  toObjectId,
-  validateService,
-  enrichBookings,
-  FREE_PLAN_LIMIT,
-} = require("../utils/helpers");
 const express = require("express");
 const { getDb } = require("../db");
 const { verifyJWT, requireRole } = require("../middleware/auth");
@@ -14,6 +6,7 @@ const {
   isPremium,
   toObjectId,
   validateService,
+  enrichBookings,
   FREE_PLAN_LIMIT,
 } = require("../utils/helpers");
 
@@ -190,6 +183,7 @@ router.delete(
     res.json({ message: "Service deleted" });
   }),
 );
+
 // Booking requests for this vendor's services
 router.get(
   "/bookings",
@@ -203,7 +197,7 @@ router.get(
   }),
 );
 
-// Accept / reject (sudhu pending, ekbar-i)
+// Accept / reject (only pending, only once)
 router.patch(
   "/bookings/:id/status",
   wrap(async (req, res) => {
@@ -233,4 +227,5 @@ router.patch(
     res.json({ message: `Booking ${status}` });
   }),
 );
+
 module.exports = router;
