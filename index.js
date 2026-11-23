@@ -20,6 +20,7 @@ app.get("/api/me", verifyJWT, (req, res) => {
 app.use("/api/services", require("./routes/services"));
 app.use("/api/vendor", require("./routes/vendor"));
 app.use("/api/admin", require("./routes/admin"));
+app.use("/api/bookings", require("./routes/bookings"));
 // 404
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
