@@ -100,5 +100,37 @@ router.delete(
     res.json({ message: "Service deleted" });
   }),
 );
+// Transactions (read-only, admin payment record bodlate parbe na)
+router.get(
+  "/transactions",
+  wrap(async (req, res) => {
+    const db = await getDb();
+    const items = await db
+      .collection("transactions")
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
 
+    const ids = [...new Set(items.map((t) => t.vendorId))]
+      .map(toObjectId)
+      .filter(Boolean);
+    const vendors = await db
+      .collection("user")
+      .find({ _id: { $in: ids } })
+      .toArray();
+    const map = new Map(
+      vendors.map((v) => [
+        v._id.toString(),
+        { name: v.name, email: v.email, businessName: v.businessName || null },
+      ]),
+    );
+
+    res.json({
+      transactions: items.map((t) => ({
+        ...t,
+        vendor: map.get(t.vendorId) || null,
+      })),
+    });
+  }),
+);
 module.exports = router;
