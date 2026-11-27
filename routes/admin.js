@@ -100,6 +100,7 @@ router.delete(
     res.json({ message: "Service deleted" });
   }),
 );
+
 // Transactions (read-only, admin payment record bodlate parbe na)
 router.get(
   "/transactions",
@@ -133,4 +134,70 @@ router.get(
     });
   }),
 );
+
+const userFields = {
+  name: 1,
+  email: 1,
+  image: 1,
+  role: 1,
+  isBlocked: 1,
+  businessName: 1,
+  subscriptionPlan: 1,
+  subscriptionExpiresAt: 1,
+  createdAt: 1,
+};
+
+// All users (search by name/email + role filter)
+router.get(
+  "/users",
+  wrap(async (req, res) => {
+    const { search, role } = req.query;
+    const filter = {};
+    if (search) {
+      const rx = { $regex: escapeRegex(String(search)), $options: "i" };
+      filter.$or = [{ name: rx }, { email: rx }];
+    }
+    if (["vendor", "customer", "admin"].includes(String(role)))
+      filter.role = String(role);
+
+    const db = await getDb();
+    const users = await db
+      .collection("user")
+      .find(filter)
+      .project(userFields)
+      .sort({ createdAt: -1 })
+      .toArray();
+    res.json({ users });
+  }),
+);
+
+// Block / unblock
+router.patch(
+  "/users/:id/block",
+  wrap(async (req, res) => {
+    const _id = toObjectId(req.params.id);
+    if (!_id) return res.status(400).json({ message: "Invalid user ID" });
+    if (typeof req.body.isBlocked !== "boolean")
+      return res
+        .status(400)
+        .json({ message: "isBlocked must be true or false" });
+    if (_id.toString() === req.user.id)
+      return res.status(403).json({ message: "You cannot block yourself" });
+
+    const db = await getDb();
+    const col = db.collection("user");
+    const target = await col.findOne({ _id });
+    if (!target) return res.status(404).json({ message: "User not found" });
+    if (target.role === "admin")
+      return res
+        .status(403)
+        .json({ message: "Admin accounts cannot be blocked" });
+
+    await col.updateOne({ _id }, { $set: { isBlocked: req.body.isBlocked } });
+    res.json({
+      message: req.body.isBlocked ? "User blocked" : "User unblocked",
+    });
+  }),
+);
+
 module.exports = router;
